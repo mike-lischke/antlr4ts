@@ -5,20 +5,18 @@
 
 // ConvertTo-TS run at 2016-10-04T11:26:36.2673893-07:00
 
-import { Array2DHashMap } from '../misc/Array2DHashMap';
-import { asIterable } from '../misc/Stubs';
-import { ATN } from './ATN';
-import { ATNConfig } from './ATNConfig';
-import { ATNConfigSet } from './ATNConfigSet';
-import { ATNState } from './ATNState';
-import { BitSet } from '../misc/BitSet';
-import { Collection } from '../misc/Stubs';
-import { EqualityComparator } from '../misc/EqualityComparator';
-import { MurmurHash } from '../misc/MurmurHash';
-import { ObjectEqualityComparator } from '../misc/ObjectEqualityComparator';
-import { Override } from '../Decorators';
-import { RuleStopState } from './RuleStopState';
-import { SemanticContext } from './SemanticContext';
+import { Array2DHashMap } from "../misc/Array2DHashMap";
+import { ATN } from "./ATN";
+import { ATNConfig } from "./ATNConfig";
+import { ATNConfigSet } from "./ATNConfigSet";
+import { ATNState } from "./ATNState";
+import { BitSet } from "../misc/BitSet";
+import { EqualityComparator } from "../misc/EqualityComparator";
+import { MurmurHash } from "../misc/MurmurHash";
+import { ObjectEqualityComparator } from "../misc/ObjectEqualityComparator";
+import { Override } from "../Decorators";
+import { RuleStopState } from "./RuleStopState";
+import { SemanticContext } from "./SemanticContext";
 
 /**
  * This enumeration defines the prediction modes available in ANTLR 4 along with
@@ -84,7 +82,7 @@ export enum PredictionMode {
 	 * This prediction mode does not provide any guarantees for prediction
 	 * behavior for syntactically-incorrect inputs.</p>
 	 */
-	LL_EXACT_AMBIG_DETECTION
+	LL_EXACT_AMBIG_DETECTION,
 }
 
 export namespace PredictionMode {
@@ -97,9 +95,10 @@ export namespace PredictionMode {
 	}
 
 	class AltAndContextConfigEqualityComparator implements EqualityComparator<ATNConfig> {
-		static readonly INSTANCE: AltAndContextConfigEqualityComparator = new AltAndContextConfigEqualityComparator();
+		public static readonly INSTANCE: AltAndContextConfigEqualityComparator = new AltAndContextConfigEqualityComparator();
 
 		private AltAndContextConfigEqualityComparator() {
+			// intentionally empty
 		}
 
 		/**
@@ -107,7 +106,7 @@ export namespace PredictionMode {
 		 * and {@link ATNConfig#context}.
 		 */
 		@Override
-		hashCode(o: ATNConfig): number {
+		public hashCode(o: ATNConfig): number {
 			let hashCode: number = MurmurHash.initialize(7);
 			hashCode = MurmurHash.update(hashCode, o.state.stateNumber);
 			hashCode = MurmurHash.update(hashCode, o.context);
@@ -116,10 +115,14 @@ export namespace PredictionMode {
 		}
 
 		@Override
-		equals(a: ATNConfig, b: ATNConfig): boolean {
-			if (a === b) return true;
-			if (a == null || b == null) return false;
-			return a.state.stateNumber == b.state.stateNumber
+		public equals(a: ATNConfig, b: ATNConfig): boolean {
+			if (a === b) {
+				return true;
+			}
+			if (a == null || b == null) {
+				return false;
+			}
+			return a.state.stateNumber === b.state.stateNumber
 				&& a.context.equals(b.context);
 		}
 	}
@@ -135,7 +138,7 @@ export namespace PredictionMode {
 	 * {@link RuleStopState}, otherwise {@code false}
 	 */
 	export function hasConfigInRuleStopState(configs: ATNConfigSet): boolean {
-		for (let c of asIterable(configs)) {
+		for (let c of configs) {
 			if (c.state instanceof RuleStopState) {
 				return true;
 			}
@@ -155,7 +158,7 @@ export namespace PredictionMode {
 	 * {@link RuleStopState}, otherwise {@code false}
 	 */
 	export function allConfigsInRuleStopStates(/*@NotNull*/ configs: ATNConfigSet): boolean {
-		for (let config of asIterable(configs)) {
+		for (let config of configs) {
 			if (!(config.state instanceof RuleStopState)) {
 				return false;
 			}
