@@ -16,7 +16,6 @@ import * as Utils from "./misc/Utils";
  * Useful for rewriting out a buffered input token stream after doing some
  * augmentation or other manipulations on it.
  *
- * <p>
  * You can insert stuff, replace, and delete chunks. Note that the operations
  * are done lazily--only if you convert the buffer to a {@link String} with
  * {@link TokenStream#getText()}. This is very efficient because you are not
@@ -25,68 +24,61 @@ import * as Utils from "./misc/Utils";
  * check to see if there is an operation at the current index. If so, the
  * operation is done and then normal {@link String} rendering continues on the
  * buffer. This is like having multiple Turing machine instruction streams
- * (programs) operating on a single input tape. :)</p>
+ * (programs) operating on a single input tape. :)
  *
- * <p>
  * This rewriter makes no modifications to the token stream. It does not ask the
  * stream to fill itself up nor does it advance the input cursor. The token
  * stream `TokenStream.index` will return the same value before and
- * after any {@link #getText()} call.</p>
+ * after any {@link #getText()} call.
  *
- * <p>
  * The rewriter only works on tokens that you have in the buffer and ignores the
  * current input cursor. If you are buffering tokens on-demand, calling
  * {@link #getText()} halfway through the input will only do rewrites for those
- * tokens in the first half of the file.</p>
+ * tokens in the first half of the file.
  *
- * <p>
  * Since the operations are done lazily at {@link #getText}-time, operations do
  * not screw up the token index values. That is, an insert operation at token
- * index {@code i} does not change the index values for tokens
- * {@code i}+1..n-1.</p>
+ * index `i` does not change the index values for tokens
+ * `i`+1..n-1.
  *
- * <p>
  * Because operations never actually alter the buffer, you may always get the
  * original token stream back without undoing anything. Since the instructions
  * are queued up, you can easily simulate transactions and roll back any changes
- * if there is an error just by removing instructions. For example,</p>
+ * if there is an error just by removing instructions. For example,
  *
- * <pre>
+ * ```
  * CharStream input = new ANTLRFileStream("input");
  * TLexer lex = new TLexer(input);
  * CommonTokenStream tokens = new CommonTokenStream(lex);
  * T parser = new T(tokens);
  * TokenStreamRewriter rewriter = new TokenStreamRewriter(tokens);
  * parser.startRule();
- * </pre>
+ * ```
  *
- * <p>
- * Then in the rules, you can execute (assuming rewriter is visible):</p>
+ * Then in the rules, you can execute (assuming rewriter is visible):
  *
- * <pre>
+ * ```
  * Token t,u;
  * ...
  * rewriter.insertAfter(t, "text to put after t");}
  * rewriter.insertAfter(u, "text after u");}
  * System.out.println(rewriter.getText());
- * </pre>
+ * ```
  *
- * <p>
  * You can also have multiple "instruction streams" and get multiple rewrites
  * from a single pass over the input. Just name the instruction streams and use
  * that name again when printing the buffer. This could be useful for generating
- * a C file and also its header file--all from the same buffer:</p>
+ * a C file and also its header file--all from the same buffer:
  *
- * <pre>
+ * ```
  * rewriter.insertAfter("pass1", t, "text to put after t");}
  * rewriter.insertAfter("pass2", u, "text after u");}
  * System.out.println(rewriter.getText("pass1"));
  * System.out.println(rewriter.getText("pass2"));
- * </pre>
+ * ```
  *
- * <p>
  * If you don't use named rewrite streams, a "default" stream is used as the
- * first example shows.</p>
+ * first example shows.
  */
 export class TokenStreamRewriter {
 	public static readonly DEFAULT_PROGRAM_NAME: string =  "default";
@@ -150,9 +142,8 @@ export class TokenStreamRewriter {
 		}
 
 		// to insert after, just insert before next index (even if past end)
-		let op = new InsertAfterOp(this.tokens, index, text);
 		let rewrites: RewriteOperation[] = this.getProgram(programName);
-		op.instructionIndex = rewrites.length;
+		let op = new InsertAfterOp(this.tokens, index, rewrites.length, text);
 		rewrites.push(op);
 	}
 
@@ -168,9 +159,8 @@ export class TokenStreamRewriter {
 			index = tokenOrIndex.tokenIndex;
 		}
 
-		let op: RewriteOperation = new InsertBeforeOp(this.tokens, index, text);
 		let rewrites: RewriteOperation[] = this.getProgram(programName);
-		op.instructionIndex = rewrites.length;
+		let op: RewriteOperation = new InsertBeforeOp(this.tokens, index, rewrites.length, text);
 		rewrites.push(op);
 	}
 
@@ -205,9 +195,8 @@ export class TokenStreamRewriter {
 			throw new RangeError(`replace: range invalid: ${from}..${to}(size=${this.tokens.size})`);
 		}
 
-		let op: RewriteOperation =  new ReplaceOp(this.tokens, from, to, text);
 		let rewrites: RewriteOperation[] = this.getProgram(programName);
-		op.instructionIndex = rewrites.length;
+		let op: RewriteOperation =  new ReplaceOp(this.tokens, from, to, rewrites.length, text);
 		rewrites.push(op);
 	}
 
@@ -371,7 +360,7 @@ export class TokenStreamRewriter {
 	 *  R.i-j.u R.x-y.v	| x-y in i-j			ERROR
 	 *  R.i-j.u R.x-y.v	| boundaries overlap	ERROR
 	 *
-	 *  Delete special case of replace (text==null):
+	 *  Delete special case of replace (text==undefined):
 	 *  D.i-j.u D.x-y.v	| boundaries overlap	combine to max(min)..max(right)
 	 *
 	 *  I.i.u R.x-y.v | i in (x+1)-y			delete I (since insert before
@@ -398,7 +387,7 @@ export class TokenStreamRewriter {
 	 * 	 insert with replace and delete this replace.
 	 * 		3. throw exception if index in same range as previous replace
 	 *
-	 *  Don't actually delete; make op null in list. Easier to walk list.
+	 *  Don't actually delete; make op undefined in list. Easier to walk list.
 	 *  Later we can throw as we add to index &rarr; op map.
 	 *
 	 *  Note that I.2 R.2-2 will wipe out I.2 even though, technically, the
@@ -549,17 +538,18 @@ export class TokenStreamRewriter {
 // Define the rewrite operation hierarchy
 
 export class RewriteOperation {
-	protected tokens: TokenStream;
+	protected readonly tokens: TokenStream;
 	/** What index into rewrites List are we? */
-	public instructionIndex: number;
+	public readonly instructionIndex: number;
 	/** Token buffer index. */
 	public index: number;
 	public text: {};
 
-	constructor(tokens: TokenStream, index: number);
-	constructor(tokens: TokenStream, index: number, text: {});
-	constructor(tokens: TokenStream, index: number, text?: {}) {
+	constructor(tokens: TokenStream, index: number, instructionIndex: number);
+	constructor(tokens: TokenStream, index: number, instructionIndex: number, text: {});
+	constructor(tokens: TokenStream, index: number, instructionIndex: number, text?: {}) {
 		this.tokens = tokens;
+		this.instructionIndex = instructionIndex;
 		this.index = index;
 		this.text = text === undefined ? "" : text;
 	}
@@ -582,8 +572,8 @@ export class RewriteOperation {
 }
 
 class InsertBeforeOp extends RewriteOperation {
-	constructor(tokens: TokenStream, index: number, text: {}) {
-		super(tokens, index, text);
+	constructor(tokens: TokenStream, index: number, instructionIndex: number, text: {}) {
+		super(tokens, index, instructionIndex, text);
 	}
 
 	@Override
@@ -601,8 +591,8 @@ class InsertBeforeOp extends RewriteOperation {
  *  of "insert after" is "insert before index+1".
  */
 class InsertAfterOp extends InsertBeforeOp {
-	constructor(tokens: TokenStream, index: number, text: {}) {
-		super(tokens, index + 1, text); // insert after is insert before index+1
+	constructor(tokens: TokenStream, index: number, instructionIndex: number, text: {}) {
+		super(tokens, index + 1, instructionIndex, text); // insert after is insert before index+1
 	}
 }
 
@@ -611,8 +601,8 @@ class InsertAfterOp extends InsertBeforeOp {
  */
 class ReplaceOp extends RewriteOperation {
 	public lastIndex: number;
-	constructor(tokens: TokenStream, from: number, to: number, text: {}) {
-		super(tokens, from, text);
+	constructor(tokens: TokenStream, from: number, to: number, instructionIndex: number, text: {}) {
+		super(tokens, from, instructionIndex, text);
 		this.lastIndex = to;
 	}
 

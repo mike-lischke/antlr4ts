@@ -165,21 +165,21 @@ export class IntegerList {
 
 	/**
 	 * Compares the specified object with this list for equality.  Returns
-	 * {@code true} if and only if the specified object is also an {@link IntegerList},
+	 * `true` if and only if the specified object is also an {@link IntegerList},
 	 * both lists have the same size, and all corresponding pairs of elements in
 	 * the two lists are equal.  In other words, two lists are defined to be
 	 * equal if they contain the same elements in the same order.
-	 * <p>
+	 *
 	 * This implementation first checks if the specified object is this
-	 * list. If so, it returns {@code true}; if not, it checks if the
-	 * specified object is an {@link IntegerList}. If not, it returns {@code false};
+	 * list. If so, it returns `true`; if not, it checks if the
+	 * specified object is an {@link IntegerList}. If not, it returns `false`;
 	 * if so, it checks the size of both lists. If the lists are not the same size,
-	 * it returns {@code false}; otherwise it iterates over both lists, comparing
-	 * corresponding pairs of elements.  If any comparison returns {@code false},
-	 * this method returns {@code false}.
+	 * it returns `false`; otherwise it iterates over both lists, comparing
+	 * corresponding pairs of elements.  If any comparison returns `false`,
+	 * this method returns `false`.
 	 *
 	 * @param o the object to be compared for equality with this list
-	 * @return {@code true} if the specified object is equal to this list
+	 * @returns `true` if the specified object is equal to this list
 	 */
 	@Override
 	public equals(o: any): boolean {
@@ -207,11 +207,11 @@ export class IntegerList {
 	/**
 	 * Returns the hash code value for this list.
 	 *
-	 * <p>This implementation uses exactly the code that is used to define the
+	 * This implementation uses exactly the code that is used to define the
 	 * list hash function in the documentation for the {@link List#hashCode}
-	 * method.</p>
+	 * method.
 	 *
-	 * @return the hash code value for this list
+	 * @returns the hash code value for this list
 	 */
 	@Override
 	public hashCode(): number {
@@ -275,4 +275,46 @@ export class IntegerList {
 		this._data = tmp;
 	}
 
+	/** Convert the list to a UTF-16 encoded char array. If all values are less
+	 *  than the 0xFFFF 16-bit code point limit then this is just a char array
+	 *  of 16-bit char as usual. For values in the supplementary range, encode
+	 * them as two UTF-16 code units.
+	 */
+	public toCharArray(): Uint16Array {
+		// Optimize for the common case (all data values are < 0xFFFF) to avoid an extra scan
+		let resultArray: Uint16Array = new Uint16Array(this._size);
+		let resultIdx = 0;
+		let calculatedPreciseResultSize = false;
+		for (let i = 0; i < this._size; i++) {
+			let codePoint = this._data[i];
+			if (codePoint >= 0 && codePoint < 0x10000) {
+				resultArray[resultIdx] = codePoint;
+				resultIdx++;
+				continue;
+			}
+
+			// Calculate the precise result size if we encounter a code point > 0xFFFF
+			if (!calculatedPreciseResultSize) {
+				let newResultArray = new Uint16Array(this.charArraySize());
+				newResultArray.set(resultArray, 0);
+				resultArray = newResultArray;
+				calculatedPreciseResultSize = true;
+			}
+
+			// This will throw RangeError if the code point is not a valid Unicode code point
+			let pair = String.fromCodePoint(codePoint);
+			resultArray[resultIdx] = pair.charCodeAt(0);
+			resultArray[resultIdx + 1] = pair.charCodeAt(1);
+			resultIdx += 2;
+		}
+		return resultArray;
+	}
+
+	private charArraySize(): number {
+		let result = 0;
+		for (let i = 0; i < this._size; i++) {
+			result += this._data[i] >= 0x10000 ? 2 : 1;
+		}
+		return result;
+	}
 }

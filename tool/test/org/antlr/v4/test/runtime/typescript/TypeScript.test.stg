@@ -162,9 +162,9 @@ Cast(t,v) ::= "(<v> as <t>)"
 
 Append(a,b) ::= "<a> + <b>"
 
-Concat(a,b) ::= "<a><b>"
+AppendStr(a,b) ::= <%<Append(a,b)>%>
 
-DeclareLocal(s,v) ::= "let <s> = <v>;"
+Concat(a,b) ::= "<a><b>"
 
 AssertIsList(v) ::= "let __ttt__: any[] = <v>;" // just use static type system
 
@@ -175,13 +175,17 @@ InitLocalIntMember(n, v) ::= <%let <n>: number = <v>;%>
 
 InitBooleanMember(n,v) ::= <%public <n>: boolean = <v>;%>
 
+InitLocalIntVar(n,v) ::= <%<InitLocalIntMember(n,v)>%>
+
+IntArg(n) ::= "number <n>"
+
+VarRef(n) ::= "<n>"
+
 GetMember(n) ::= <%this.<n>%>
 
 SetMember(n,v) ::= <%this.<n> = <v>;%>
 
 AddMember(n,v) ::= <%this.<n> += <v>;%>
-
-PlusMember(v,n) ::= <%<v> + this.<n>%>
 
 MemberEquals(n,v) ::= <%this.<n> === <v>%>
 
@@ -205,7 +209,7 @@ Column() ::= "this.charPositionInLine"
 
 Text() ::= "this.text"
 
-ValEquals(a,b) ::= <%<a>==<b>%>
+ValEquals(a,b) ::= <%<a> === <b>%>
 
 TextEquals(a) ::= <%this.text === "<a>"%>
 
@@ -266,8 +270,9 @@ public Property(): boolean {
 
 ParserPropertyCall(p, call) ::= "<p>.<call>"
 
+PositionAdjustingLexerDef() ::= ""
+
 PositionAdjustingLexer() ::= <<
-@members {
 public nextToken(): Token {
 	if (!(this._interp instanceof PositionAdjustingLexerATNSimulator)) {
 		this._interp = new PositionAdjustingLexerATNSimulator(PositionAdjustingLexer._ATN, this);
@@ -326,6 +331,8 @@ get interpreter(): PositionAdjustingLexerATNSimulator {
 private static isIdentifierChar(c: string): boolean {
 	return /^[a-zA-Z0-9_]$/.test(c);
 }
+
+<! Close out the @members element before opening other elements !>
 }
 
 @beforeLexer {
@@ -346,7 +353,6 @@ export class PositionAdjustingLexerATNSimulator extends LexerATNSimulator {
 		this.consume(input);
 	}
 
-}
 }
 >>
 
@@ -374,7 +380,7 @@ import { ParserRuleContext as PRC } from "antlr4ts/ParserRuleContext";
 
 export class MyRuleNode extends PRC {
 	private altNum: number;
-	constructor(parent: PRC, invokingStateNumber: number) {
+	constructor(parent: PRC | undefined, invokingStateNumber: number) {
 		super(parent, invokingStateNumber);
 	}
 
@@ -465,17 +471,17 @@ console.log(new LeafVisitor().visit(<s>));
 TerminalVisitor(grammarName) ::= <<
 @parser::afterParser {
 export class LeafVisitor extends AbstractParseTreeVisitor\<string> implements <grammarName>Visitor\<string> {
-	@Override
+	// @Override
 	public visitTerminal(node: TerminalNode): string {
 		return node.symbol.toString() + "\n";
 	}
 
-	@Override
+	// @Override
 	protected defaultResult(): string {
 		return "";
 	}
 
-	@Override
+	// @Override
 	protected aggregateResult(aggregate: string, nextResult: string): string {
 		return aggregate + nextResult;
 	}
@@ -486,17 +492,17 @@ export class LeafVisitor extends AbstractParseTreeVisitor\<string> implements <g
 ErrorVisitor(grammarName) ::= <<
 @parser::afterParser {
 export class LeafVisitor extends AbstractParseTreeVisitor\<string> implements <grammarName>Visitor\<string> {
-	@Override
+	// @Override
 	public visitErrorNode(node: ErrorNode): string {
 		return "Error encountered: " + node.symbol.toString();
 	}
 
-	@Override
+	// @Override
 	protected defaultResult(): string {
 		return "";
 	}
 
-	@Override
+	// @Override
 	protected aggregateResult(aggregate: string, nextResult: string): string {
 		return aggregate + nextResult;
 	}
@@ -507,17 +513,17 @@ export class LeafVisitor extends AbstractParseTreeVisitor\<string> implements <g
 ShouldNotVisitEOFVisitor(grammarName) ::= <<
 @parser::afterParser {
 export class LeafVisitor extends AbstractParseTreeVisitor\<string> implements <grammarName>Visitor\<string> {
-	@Override
+	// @Override
 	public visitTerminal(node: TerminalNode): string {
 		return node.symbol.toString() + "\n";
 	}
 
-	@Override
+	// @Override
 	protected defaultResult(): string {
 		return "";
 	}
 
-	@Override
+	// @Override
 	protected shouldVisitNextChild(node: RuleNode, currentResult: string): boolean {
 		return currentResult.length === 0;
 	}
@@ -528,17 +534,17 @@ export class LeafVisitor extends AbstractParseTreeVisitor\<string> implements <g
 ShouldNotVisitTerminalVisitor(grammarName) ::= <<
 @parser::afterParser {
 export class LeafVisitor extends AbstractParseTreeVisitor\<string> implements <grammarName>Visitor\<string> {
-	@Override
+	// @Override
 	public visitTerminal(node: TerminalNode): never {
 		throw new Error("Should not be reachable");
 	}
 
-	@Override
+	// @Override
 	protected defaultResult(): string {
 		return "default result";
 	}
 
-	@Override
+	// @Override
 	protected shouldVisitNextChild(node: RuleNode, currentResult: string): boolean {
 		return false;
 	}
@@ -549,17 +555,17 @@ export class LeafVisitor extends AbstractParseTreeVisitor\<string> implements <g
 CalculatorVisitor(grammarName) ::= <<
 @parser::afterParser {
 export class LeafVisitor extends AbstractParseTreeVisitor\<number> implements <grammarName>Visitor\<number> {
-	@Override
+	// @Override
 	public visitS(context: SContext): number {
 		return this.visit(context.expr());
 	}
 
-	@Override
+	// @Override
 	public visitNumber(context: NumberContext): number {
 		return Number(context.INT().text);
 	}
 
-	@Override
+	// @Override
 	public visitMultiply(context: MultiplyContext): number {
 		let left: number = this.visit(context.expr(0));
 		let right: number = this.visit(context.expr(1));
@@ -571,7 +577,7 @@ export class LeafVisitor extends AbstractParseTreeVisitor\<number> implements <g
 		}
 	}
 
-	@Override
+	// @Override
 	public visitAdd(context: AddContext): number {
 		let left: number = this.visit(context.expr(0));
 		let right: number = this.visit(context.expr(1));
@@ -583,12 +589,12 @@ export class LeafVisitor extends AbstractParseTreeVisitor\<number> implements <g
 		}
 	}
 
-	@Override
+	// @Override
 	protected defaultResult(): never {
 		throw new Error("Should not be reachable");
 	}
 
-	@Override
+	// @Override
 	protected aggregateResult(aggregate: number, nextResult: number): never {
 		throw new Error("Should not be reachable");
 	}
@@ -628,17 +634,6 @@ IgnoredTests ::= [
 	// Skipped due to limitations in the testing framework
 
 	// Skipped due to limitations in the TypeScript target
-	"CompositeParsers.DelegatorInvokesDelegateRuleWithArgs": "Arguments are not supported with labeled outer alternatives.",
-
-	"SemPredEvalParser.AtomWithClosureInTranslatedLRRule": "Arguments are not supported with labeled outer alternatives.",
-	"SemPredEvalParser.DepedentPredsInGlobalFOLLOW": "Arguments are not supported with labeled outer alternatives.",
-	"SemPredEvalParser.DependentPredNotInOuterCtxShouldBeIgnored": "Arguments are not supported with labeled outer alternatives.",
-	"SemPredEvalParser.PredicateDependentOnArg": "Arguments are not supported with labeled outer alternatives.",
-	"SemPredEvalParser.PredicateDependentOnArg2": "Arguments are not supported with labeled outer alternatives.",
-
-	"FullContextParsing.ExprAmbiguity_1": "Arguments are not supported with labeled outer alternatives.",
-	"FullContextParsing.ExprAmbiguity_2": "Arguments are not supported with labeled outer alternatives.",
-
 	"Performance.DropLoopEntryBranchInLRRule_4": "Need a timeout of 15000ms for this to pass.",
 
 	default: false

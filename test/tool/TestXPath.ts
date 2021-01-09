@@ -5,8 +5,8 @@
 
 // ConvertTo-TS run at 2016-10-04T11:27:38.8508887-07:00
 
-import { ANTLRInputStream } from "../../src/ANTLRInputStream";
 import { CharStream } from "../../src/CharStream";
+import { CharStreams } from "../../src/CharStreams";
 import { CommonTokenStream } from "../../src/CommonTokenStream";
 import { Lexer } from "../../src/Lexer";
 import { Parser } from "../../src/Parser";
@@ -20,8 +20,7 @@ import { TestXPathLexer } from "./gen/xpath/TestXPathLexer";
 import { TestXPathParser } from "./gen/xpath/TestXPathParser";
 
 import * as assert from "assert";
-import { suite, test as Test, skip as Ignore } from "mocha-typescript";
-
+import { suite, test as Test, skip as Ignore } from "@testdeck/mocha";
 
 const SAMPLE_PROGRAM: string =
 	"def f(x,y) { x = 3+4; y; ; }\n" +
@@ -87,53 +86,53 @@ export class TestXPath {
 
 	@Test public testWeirdChar(): void {
 		let path: string = "&";
-		let expected: string = "Invalid tokens or characters at index 0 in path '&'";
+		let expected: RegExp = /^RangeError: Invalid tokens or characters at index 0 in path '&' -- $/;
 
 		this.testError(SAMPLE_PROGRAM, path, expected, (parser) => parser.prog(), TestXPathLexer, TestXPathParser);
 	}
 
 	@Test public testWeirdChar2(): void {
 		let path: string = "//w&e/";
-		let expected: string = "Invalid tokens or characters at index 3 in path '//w&e/'";
+		let expected: RegExp = /^RangeError: Invalid tokens or characters at index 3 in path '\/\/w&e\/' -- $/;
 
 		this.testError(SAMPLE_PROGRAM, path, expected, (parser) => parser.prog(), TestXPathLexer, TestXPathParser);
 	}
 
 	@Test public testBadSyntax(): void {
 		let path: string = "///";
-		let expected: string = "/ at index 2 isn't a valid rule name";
+		let expected: RegExp = /^Error: \/ at index 2 isn't a valid rule name$/;
 
 		this.testError(SAMPLE_PROGRAM, path, expected, (parser) => parser.prog(), TestXPathLexer, TestXPathParser);
 	}
 
 	@Test public testMissingWordAtEnd(): void {
 		let path: string = "//";
-		let expected: string = "Missing path element at end of path";
+		let expected: RegExp = /^Error: Missing path element at end of path$/;
 
 		this.testError(SAMPLE_PROGRAM, path, expected, (parser) => parser.prog(), TestXPathLexer, TestXPathParser);
 	}
 
 	@Test public testBadTokenName(): void {
 		let path: string = "//Ick";
-		let expected: string = "Ick at index 2 isn't a valid token name";
+		let expected: RegExp = /^Error: Ick at index 2 isn't a valid token name$/;
 
 		this.testError(SAMPLE_PROGRAM, path, expected, (parser) => parser.prog(), TestXPathLexer, TestXPathParser);
 	}
 
 	@Test public testBadRuleName(): void {
 		let path: string = "/prog/ick";
-		let expected: string = "ick at index 6 isn't a valid rule name";
+		let expected: RegExp = /^Error: ick at index 6 isn't a valid rule name$/;
 
 		this.testError(SAMPLE_PROGRAM, path, expected, (parser) => parser.prog(), TestXPathLexer, TestXPathParser);
 	}
 
 	protected testError<TParser extends Parser>(
-		input: string, path: string, expected: string,
+		input: string, path: string, expected: RegExp,
 		startRule: (parser: TParser) => ParseTree,
 		lexerCtor: {new(stream: CharStream): Lexer},
 		parserCtor: {new(stream: TokenStream): TParser}): void {
 
-		let lexer = new lexerCtor(new ANTLRInputStream(input));
+		let lexer = new lexerCtor(CharStreams.fromString(input));
 		let parser = new parserCtor(new CommonTokenStream(lexer));
 		let tree: ParseTree = startRule(parser);
 
@@ -146,7 +145,7 @@ export class TestXPath {
 		lexerCtor: {new(stream: CharStream): Lexer},
 		parserCtor: {new(stream: TokenStream): TParser}): string[] {
 
-		let lexer = new lexerCtor(new ANTLRInputStream(input));
+		let lexer = new lexerCtor(CharStreams.fromString(input));
 		let parser = new parserCtor(new CommonTokenStream(lexer));
 		let tree: ParseTree = startRule(parser);
 

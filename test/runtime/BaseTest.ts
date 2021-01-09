@@ -5,12 +5,12 @@
 
 import * as assert from "assert";
 import * as stdMocks from "std-mocks";
+import { Console } from "console";
 
-import { ANTLRInputStream } from "antlr4ts/ANTLRInputStream";
 import { CharStream } from "antlr4ts/CharStream";
+import { CharStreams } from "antlr4ts/CharStreams";
 import { CommonTokenStream } from "antlr4ts/CommonTokenStream";
 import { DiagnosticErrorListener } from "antlr4ts/DiagnosticErrorListener";
-import { ErrorNode } from "antlr4ts/tree/ErrorNode";
 import { Lexer } from "antlr4ts/Lexer";
 import { Parser } from "antlr4ts/Parser";
 import { ParserRuleContext } from "antlr4ts/ParserRuleContext";
@@ -18,14 +18,30 @@ import { ParseTree } from "antlr4ts/tree/ParseTree";
 import { ParseTreeListener } from "antlr4ts/tree/ParseTreeListener";
 import { ParseTreeWalker } from "antlr4ts/tree/ParseTreeWalker";
 import { RuleNode } from "antlr4ts/tree/RuleNode";
-import { TerminalNode } from "antlr4ts/tree/TerminalNode";
+
+function trySetConsole(valueFactory: () => Console): boolean {
+	try {
+		console = valueFactory();
+		return true;
+	} catch (ex) {
+		if (!(ex instanceof TypeError)) {
+			throw ex;
+		}
+
+		// Older versions of Node.js do not support setting 'console'
+		return false;
+	}
+}
 
 function expectConsole( expectedOutput: string, expectedErrors: string, testFunction: () => void ) {
+	let priorConsole = console;
 	try {
+		trySetConsole(() => new Console({ stdout: process.stdout, stderr: process.stderr, colorMode: false }));
 		stdMocks.use();
 		testFunction();
 	} finally {
 		stdMocks.restore();
+		trySetConsole(() => priorConsole);
 	}
 	let streams = stdMocks.flush();
 	let output = streams.stdout.join("");
@@ -36,8 +52,8 @@ function expectConsole( expectedOutput: string, expectedErrors: string, testFunc
 		output += "\n";
 	}
 
-	assert.equal( output, expectedOutput);
-	assert.equal( errors, expectedErrors);
+	assert.strictEqual(output, expectedOutput);
+	assert.strictEqual(errors, expectedErrors);
 }
 
 export interface LexerTestOptions {
@@ -67,7 +83,7 @@ class TreeShapeListener implements ParseTreeListener {
 }
 
 export function lexerTest(options: LexerTestOptions) {
-	const inputStream: CharStream = new ANTLRInputStream(options.input);
+	const inputStream: CharStream = CharStreams.fromString(options.input);
 	const lex = new options.lexer(inputStream);
 	const tokens = new CommonTokenStream(lex);
 	expectConsole( options.expectedOutput, options.expectedErrors, () => {
@@ -80,7 +96,7 @@ export function lexerTest(options: LexerTestOptions) {
 }
 
 export function parserTest<TParser extends Parser>(options: ParserTestOptions<TParser>) {
-	const inputStream: CharStream = new ANTLRInputStream(options.input);
+	const inputStream: CharStream = CharStreams.fromString(options.input);
 	const lex = new options.lexer(inputStream);
 	const tokens = new CommonTokenStream(lex);
 	const parser = new options.parser(tokens);

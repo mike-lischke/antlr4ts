@@ -7,6 +7,7 @@
 
 import { Parser } from "../Parser";
 import { ParseTreeVisitor } from "./ParseTreeVisitor";
+import { RuleContext } from "../RuleContext";
 import { SyntaxTree } from "./SyntaxTree";
 
 /** An interface to access the tree of {@link RuleContext} objects created
@@ -14,12 +15,19 @@ import { SyntaxTree } from "./SyntaxTree";
  *  This node represents both internal nodes, rule invocations,
  *  and leaf nodes, token matches.
  *
- *  <p>The payload is either a {@link Token} or a {@link RuleContext} object.</p>
+ *  The payload is either a {@link Token} or a {@link RuleContext} object.
  */
 export interface ParseTree extends SyntaxTree {
 	// the following methods narrow the return type; they are not additional methods
 	//@Override
 	readonly parent: ParseTree | undefined;
+
+	/**
+	 * Set the parent for this node.
+	 *
+	 * @since 4.7
+	 */
+	setParent(parent: RuleContext): void;
 
 	//@Override
 	getChild(i: number): ParseTree;

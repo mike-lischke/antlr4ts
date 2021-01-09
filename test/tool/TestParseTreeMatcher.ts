@@ -5,8 +5,8 @@
 
 // ConvertTo-TS run at 2016-10-04T11:27:15.0984506-07:00
 
-import { ANTLRInputStream } from "../../src/ANTLRInputStream";
 import { CharStream } from "../../src/CharStream";
+import { CharStreams } from "../../src/CharStreams";
 import { CommonTokenStream } from "../../src/CommonTokenStream";
 import { InputMismatchException } from "../../src/InputMismatchException";
 import { Lexer } from "../../src/Lexer";
@@ -37,7 +37,7 @@ import { ParseTreeMatcherX8Lexer } from "./gen/matcher/ParseTreeMatcherX8Lexer";
 import { ParseTreeMatcherX8Parser } from "./gen/matcher/ParseTreeMatcherX8Parser";
 
 import * as assert from "assert";
-import { suite, test as Test, skip as Ignore } from "mocha-typescript";
+import { suite, test as Test, skip as Ignore } from "@testdeck/mocha";
 
 @suite
 export class TestParseTreeMatcher {
@@ -61,17 +61,17 @@ export class TestParseTreeMatcher {
 
 	@Test public testInvertedTags(): void {
 		let m: ParseTreePatternMatcher = this.getPatternMatcher(ParseTreeMatcherX1Lexer, ParseTreeMatcherX1Parser);
-		assert.throws(() => m.split(">expr<"), "tag delimiters out of order in pattern: >expr<");
+		assert.throws(() => m.split(">expr<"), /^Error: tag delimiters out of order in pattern: >expr<$/);
 	}
 
 	@Test public testUnclosedTag(): void {
 		let m: ParseTreePatternMatcher = this.getPatternMatcher(ParseTreeMatcherX1Lexer, ParseTreeMatcherX1Parser);
-		assert.throws(() => m.split("<expr hi mom"), "unterminated tag in pattern: <expr hi mom");
+		assert.throws(() => m.split("<expr hi mom"), /^Error: unterminated tag in pattern: <expr hi mom$/);
 	}
 
 	@Test public testExtraClose(): void {
 		let m: ParseTreePatternMatcher = this.getPatternMatcher(ParseTreeMatcherX1Lexer, ParseTreeMatcherX1Parser);
-		assert.throws(() => m.split("<expr> >"), "missing start tag in pattern: <expr> >");
+		assert.throws(() => m.split("<expr> >"), /^Error: missing start tag in pattern: <expr> >$/);
 	}
 
 	@Test public testTokenizingPattern(): void {
@@ -228,7 +228,7 @@ export class TestParseTreeMatcher {
 	@Test public async testLRecursiveExpr(): Promise<void> {
 		let input: string = "3*4*5";
 		let pattern: string = "<expr> * <expr> * <expr>";
-		this.checkPatternMatch((parser) => parser.expr(), ParseTreeMatcherX8Parser.RULE_expr, input, pattern, ParseTreeMatcherX8Lexer, ParseTreeMatcherX8Parser);
+		await this.checkPatternMatch((parser) => parser.expr(), ParseTreeMatcherX8Parser.RULE_expr, input, pattern, ParseTreeMatcherX8Lexer, ParseTreeMatcherX8Parser);
 	}
 
 	private execParser<TParser extends Parser>(
@@ -237,7 +237,7 @@ export class TestParseTreeMatcher {
 		lexerCtor: {new(stream: CharStream): Lexer},
 		parserCtor: {new(stream: TokenStream): TParser}): ParseTree {
 
-		let lexer = new lexerCtor(new ANTLRInputStream(input));
+		let lexer = new lexerCtor(CharStreams.fromString(input));
 		let parser = new parserCtor(new CommonTokenStream(lexer));
 		return startRule(parser);
 	}
@@ -262,13 +262,13 @@ export class TestParseTreeMatcher {
 	}
 
 	private async getPattern(lexerCtor: {new(stream: CharStream): Lexer}, parserCtor: {new(stream: TokenStream): Parser}, pattern: string, ruleIndex: number): Promise<ParseTreePattern> {
-		let lexer: Lexer = new lexerCtor(new ANTLRInputStream(""));
+		let lexer: Lexer = new lexerCtor(CharStreams.fromString(""));
 		let parser: Parser = new parserCtor(new CommonTokenStream(lexer));
-		return await parser.compileParseTreePattern(pattern, ruleIndex);
+		return parser.compileParseTreePattern(pattern, ruleIndex);
 	}
 
 	private getPatternMatcher(lexerCtor: {new(stream: CharStream): Lexer}, parserCtor: {new(stream: TokenStream): Parser}): ParseTreePatternMatcher {
-		let lexer: Lexer = new lexerCtor(new ANTLRInputStream(""));
+		let lexer: Lexer = new lexerCtor(CharStreams.fromString(""));
 		let parser: Parser = new parserCtor(new CommonTokenStream(lexer));
 		return new ParseTreePatternMatcher(lexer, parser);
 	}

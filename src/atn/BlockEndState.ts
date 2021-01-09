@@ -10,9 +10,10 @@ import { ATNStateType } from "./ATNStateType";
 import { BlockStartState } from "./BlockStartState";
 import { Override } from "../Decorators";
 
-/** Terminal node of a simple {@code (a|b|c)} block. */
+/** Terminal node of a simple `(a|b|c)` block. */
 export class BlockEndState extends ATNState {
-	public startState: BlockStartState;
+	// This is always set during ATN deserialization
+	public startState!: BlockStartState;
 
 	@Override
 	get stateType(): ATNStateType {

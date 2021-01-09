@@ -57,6 +57,20 @@ import { TransitionType } from "./TransitionType";
 import { UUID } from "../misc/UUID";
 import { WildcardTransition } from "./WildcardTransition";
 
+interface UnicodeDeserializer {
+	// Wrapper for readInt() or readInt32()
+	readUnicode(data: Uint16Array, p: number): number;
+
+	// Work around Java not allowing mutation of captured variables
+	// by returning amount by which to increment p after each read
+	readonly size: number;
+}
+
+const enum UnicodeDeserializingMode {
+	UNICODE_BMP,
+	UNICODE_SMP,
+}
+
 /**
  *
  * @author Sam Harwell
@@ -88,7 +102,7 @@ export class ATNDeserializer {
 	 * IntervalSets, where the second set's values are encoded as
 	 * 32-bit integers to support the full Unicode SMP range up to U+10FFFF.
 	 */
-	private static readonly ADDED_UNICODE_SMP: UUID = UUID.fromString("59627784-3BE5-417A-B9EB-8131A7286089");
+	private static readonly ADDED_UNICODE_SMP: UUID = UUID.fromString("C23FEA89-0605-4f51-AFB8-058BCAB8C91B");
 	/**
 	 * This list contains all of the currently supported UUIDs, ordered by when
 	 * the feature first appeared in this branch.
@@ -108,7 +122,7 @@ export class ATNDeserializer {
 	private readonly deserializationOptions: ATNDeserializationOptions;
 
 	constructor(deserializationOptions?: ATNDeserializationOptions) {
-		if (deserializationOptions == null) {
+		if (deserializationOptions === undefined) {
 			deserializationOptions = ATNDeserializationOptions.defaultOptions;
 		}
 
@@ -124,17 +138,35 @@ export class ATNDeserializer {
 	 * supported in the serialized ATN.
 	 * @param actualUuid The {@link UUID} of the actual serialized ATN which is
 	 * currently being deserialized.
-	 * @return {@code true} if the {@code actualUuid} value represents a
-	 * serialized ATN at or after the feature identified by {@code feature} was
-	 * introduced; otherwise, {@code false}.
+	 * @returns `true` if the `actualUuid` value represents a
+	 * serialized ATN at or after the feature identified by `feature` was
+	 * introduced; otherwise, `false`.
 	 */
-	protected isFeatureSupported(feature: UUID, actualUuid: UUID): boolean {
+	protected static isFeatureSupported(feature: UUID, actualUuid: UUID): boolean {
 		let featureIndex: number = ATNDeserializer.SUPPORTED_UUIDS.findIndex((e) => e.equals(feature));
 		if (featureIndex < 0) {
 			return false;
 		}
 
 		return ATNDeserializer.SUPPORTED_UUIDS.findIndex((e) => e.equals(actualUuid)) >= featureIndex;
+	}
+
+	private static getUnicodeDeserializer(mode: UnicodeDeserializingMode): UnicodeDeserializer {
+		if (mode === UnicodeDeserializingMode.UNICODE_BMP) {
+			return {
+				readUnicode: (data: Uint16Array, p: number): number => {
+					return ATNDeserializer.toInt(data[p]);
+				},
+				size: 1,
+			};
+		} else {
+			return {
+				readUnicode: (data: Uint16Array, p: number): number => {
+					return ATNDeserializer.toInt32(data, p);
+				},
+				size: 2,
+			};
+		}
 	}
 
 	public deserialize(@NotNull data: Uint16Array): ATN {
@@ -167,7 +199,7 @@ export class ATNDeserializer {
 			throw new Error(reason);
 		}
 
-		let supportsLexerActions: boolean = this.isFeatureSupported(ATNDeserializer.ADDED_LEXER_ACTIONS, uuid);
+		let supportsLexerActions: boolean = ATNDeserializer.isFeatureSupported(ATNDeserializer.ADDED_LEXER_ACTIONS, uuid);
 
 		let grammarType: ATNType = ATNDeserializer.toInt(data[p++]);
 		let maxTokenType: number = ATNDeserializer.toInt(data[p++]);
@@ -253,7 +285,7 @@ export class ATNDeserializer {
 
 				atn.ruleToTokenType[i] = tokenType;
 
-				if (!this.isFeatureSupported(ATNDeserializer.ADDED_LEXER_ACTIONS, uuid)) {
+				if (!ATNDeserializer.isFeatureSupported(ATNDeserializer.ADDED_LEXER_ACTIONS, uuid)) {
 					// this piece of unused metadata was serialized prior to the
 					// addition of LexerAction
 					let actionIndexIgnored: number = ATNDeserializer.toInt(data[p++]);
@@ -292,12 +324,14 @@ export class ATNDeserializer {
 		// SETS
 		//
 		let sets: IntervalSet[] = [];
-		p = this.readSets(data, p, sets, false);
+
+		// First, read all sets with 16-bit Unicode code points <= U+FFFF.
+		p = this.deserializeSets(data, p, sets, ATNDeserializer.getUnicodeDeserializer(UnicodeDeserializingMode.UNICODE_BMP));
 
 		// Next, if the ATN was serialized with the Unicode SMP feature,
 		// deserialize sets with 32-bit arguments <= U+10FFFF.
-		if (this.isFeatureSupported(ATNDeserializer.ADDED_UNICODE_SMP, uuid)) {
-			p = this.readSets(data, p, sets, true);
+		if (ATNDeserializer.isFeatureSupported(ATNDeserializer.ADDED_UNICODE_SMP, uuid)) {
+			p = this.deserializeSets(data, p, sets, ATNDeserializer.getUnicodeDeserializer(UnicodeDeserializingMode.UNICODE_SMP));
 		}
 
 		//
@@ -367,12 +401,12 @@ export class ATNDeserializer {
 		for (let state of atn.states) {
 			if (state instanceof BlockStartState) {
 				// we need to know the end state to set its start state
-				if (state.endState == null) {
+				if (state.endState === undefined) {
 					throw new Error("IllegalStateException");
 				}
 
 				// block end states can only be associated to a single block start state
-				if (state.endState.startState != null) {
+				if (state.endState.startState !== undefined) {
 					throw new Error("IllegalStateException");
 				}
 
@@ -582,7 +616,7 @@ export class ATNDeserializer {
 		return atn;
 	}
 
-	private readSets(data: Uint16Array, p: number, sets: IntervalSet[], read32: boolean): number {
+	private deserializeSets(data: Uint16Array, p: number, sets: IntervalSet[], unicodeDeserializer: UnicodeDeserializer): number {
 		let nsets: number = ATNDeserializer.toInt(data[p++]);
 		for (let i = 0; i < nsets; i++) {
 			let nintervals: number = ATNDeserializer.toInt(data[p]);
@@ -595,16 +629,12 @@ export class ATNDeserializer {
 				set.add(-1);
 			}
 
-			if (read32) {
-				for (let j = 0; j < nintervals; j++) {
-					set.add(ATNDeserializer.toInt32(data, p), ATNDeserializer.toInt32(data, p + 2));
-					p += 4;
-				}
-			} else {
-				for (let j = 0; j < nintervals; j++) {
-					set.add(ATNDeserializer.toInt(data[p]), ATNDeserializer.toInt(data[p + 1]));
-					p += 2;
-				}
+			for (let j: number = 0; j < nintervals; j++) {
+				let a: number = unicodeDeserializer.readUnicode(data, p);
+				p += unicodeDeserializer.size;
+				let b: number = unicodeDeserializer.readUnicode(data, p);
+				p += unicodeDeserializer.size;
+				set.add(a, b);
 			}
 		}
 
@@ -664,7 +694,7 @@ export class ATNDeserializer {
 	protected verifyATN(atn: ATN): void {
 		// verify assumptions
 		for (let state of atn.states) {
-			this.checkCondition(state != null, "ATN states should not be null.");
+			this.checkCondition(state !== undefined, "ATN states should not be undefined.");
 			if (state.stateType === ATNStateType.INVALID_TYPE) {
 				continue;
 			}
@@ -672,12 +702,12 @@ export class ATNDeserializer {
 			this.checkCondition(state.onlyHasEpsilonTransitions || state.numberOfTransitions <= 1);
 
 			if (state instanceof PlusBlockStartState) {
-				this.checkCondition(state.loopBackState != null);
+				this.checkCondition(state.loopBackState !== undefined);
 			}
 
 			if (state instanceof StarLoopEntryState) {
 				let starLoopEntryState: StarLoopEntryState = state;
-				this.checkCondition(starLoopEntryState.loopBackState != null);
+				this.checkCondition(starLoopEntryState.loopBackState !== undefined);
 				this.checkCondition(starLoopEntryState.numberOfTransitions === 2);
 
 				if (starLoopEntryState.transition(0).target instanceof StarBlockStartState) {
@@ -699,19 +729,19 @@ export class ATNDeserializer {
 			}
 
 			if (state instanceof LoopEndState) {
-				this.checkCondition(state.loopBackState != null);
+				this.checkCondition(state.loopBackState !== undefined);
 			}
 
 			if (state instanceof RuleStartState) {
-				this.checkCondition(state.stopState != null);
+				this.checkCondition(state.stopState !== undefined);
 			}
 
 			if (state instanceof BlockStartState) {
-				this.checkCondition(state.endState != null);
+				this.checkCondition(state.endState !== undefined);
 			}
 
 			if (state instanceof BlockEndState) {
-				this.checkCondition(state.startState != null);
+				this.checkCondition(state.startState !== undefined);
 			}
 
 			if (state instanceof DecisionState) {
@@ -733,7 +763,7 @@ export class ATNDeserializer {
 	private static inlineSetRules(atn: ATN): number {
 		let inlinedCalls: number = 0;
 
-		let ruleToInlineTransition: Transition[] = new Array<Transition>(atn.ruleToStartState.length);
+		let ruleToInlineTransition = new Array<Transition | undefined>(atn.ruleToStartState.length);
 		for (let i = 0; i < atn.ruleToStartState.length; i++) {
 			let startState: RuleStartState = atn.ruleToStartState[i];
 			let middleState: ATNState = startState;
@@ -782,7 +812,7 @@ export class ATNDeserializer {
 			for (let i = 0; i < state.numberOfOptimizedTransitions; i++) {
 				let transition: Transition = state.getOptimizedTransition(i);
 				if (!(transition instanceof RuleTransition)) {
-					if (optimizedTransitions != null) {
+					if (optimizedTransitions !== undefined) {
 						optimizedTransitions.push(transition);
 					}
 
@@ -790,16 +820,16 @@ export class ATNDeserializer {
 				}
 
 				let ruleTransition: RuleTransition = transition;
-				let effective: Transition = ruleToInlineTransition[ruleTransition.target.ruleIndex];
-				if (effective == null) {
-					if (optimizedTransitions != null) {
+				let effective: Transition | undefined = ruleToInlineTransition[ruleTransition.target.ruleIndex];
+				if (effective === undefined) {
+					if (optimizedTransitions !== undefined) {
 						optimizedTransitions.push(transition);
 					}
 
 					continue;
 				}
 
-				if (optimizedTransitions == null) {
+				if (optimizedTransitions === undefined) {
 					optimizedTransitions = [];
 					for (let j = 0; j < i; j++) {
 						optimizedTransitions.push(state.getOptimizedTransition(i));
@@ -831,7 +861,7 @@ export class ATNDeserializer {
 				}
 			}
 
-			if (optimizedTransitions != null) {
+			if (optimizedTransitions !== undefined) {
 				if (state.isOptimized) {
 					while (state.numberOfOptimizedTransitions > 0) {
 						state.removeOptimizedTransition(state.numberOfOptimizedTransitions - 1);
@@ -868,7 +898,7 @@ export class ATNDeserializer {
 					|| (transition as EpsilonTransition).outermostPrecedenceReturn !== -1
 					|| intermediate.stateType !== ATNStateType.BASIC
 					|| !intermediate.onlyHasEpsilonTransitions) {
-					if (optimizedTransitions != null) {
+					if (optimizedTransitions !== undefined) {
 						optimizedTransitions.push(transition);
 					}
 
@@ -878,7 +908,7 @@ export class ATNDeserializer {
 				for (let j = 0; j < intermediate.numberOfOptimizedTransitions; j++) {
 					if (intermediate.getOptimizedTransition(j).serializationType !== TransitionType.EPSILON
 						|| (intermediate.getOptimizedTransition(j) as EpsilonTransition).outermostPrecedenceReturn !== -1) {
-						if (optimizedTransitions != null) {
+						if (optimizedTransitions !== undefined) {
 							optimizedTransitions.push(transition);
 						}
 
@@ -887,7 +917,7 @@ export class ATNDeserializer {
 				}
 
 				removedEdges++;
-				if (optimizedTransitions == null) {
+				if (optimizedTransitions === undefined) {
 					optimizedTransitions = [];
 					for (let j = 0; j < i; j++) {
 						optimizedTransitions.push(state.getOptimizedTransition(j));
@@ -900,7 +930,7 @@ export class ATNDeserializer {
 				}
 			}
 
-			if (optimizedTransitions != null) {
+			if (optimizedTransitions !== undefined) {
 				if (state.isOptimized) {
 					while (state.numberOfOptimizedTransitions > 0) {
 						state.removeOptimizedTransition(state.numberOfOptimizedTransitions - 1);

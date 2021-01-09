@@ -40,7 +40,7 @@ export abstract class Lexer extends Recognizer<number, LexerATNSimulator>
 	}
 
 	public static readonly MIN_CHAR_VALUE: number = 0x0000;
-	public static readonly MAX_CHAR_VALUE: number = 0xFFFF;
+	public static readonly MAX_CHAR_VALUE: number = 0x10FFFF;
 
 	public _input: CharStream;
 
@@ -54,7 +54,7 @@ export abstract class Lexer extends Recognizer<number, LexerATNSimulator>
 	 *  create a single token.  nextToken will return this object after
 	 *  matching lexer rule(s).  If you subclass to allow multiple token
 	 *  emissions, then set this to the last token to be matched or
-	 *  something nonnull so that the auto token emit mechanism will not
+	 *  something non-undefined so that the auto token emit mechanism will not
 	 *  emit another token.
 	 */
 	public _token: Token | undefined;
@@ -100,7 +100,7 @@ export abstract class Lexer extends Recognizer<number, LexerATNSimulator>
 	public reset(resetInput: boolean): void;
 	public reset(resetInput?: boolean): void {
 		// wack Lexer state variables
-		if (resetInput === undefined || resetInput === true) {
+		if (resetInput === undefined || resetInput) {
 			this._input.seek(0); // rewind the input
 		}
 
@@ -188,7 +188,7 @@ export abstract class Lexer extends Recognizer<number, LexerATNSimulator>
 	/** Instruct the lexer to skip creating a token for current lexer rule
 	 *  and look for another token.  nextToken() knows to keep looking when
 	 *  a lexer rule finishes with token set to SKIP_TOKEN.  Recall that
-	 *  if token==null at end of any token rule, it creates one for you
+	 *  if token==undefined at end of any token rule, it creates one for you
 	 *  and emits it.
 	 */
 	public skip(): void {
@@ -349,6 +349,8 @@ export abstract class Lexer extends Recognizer<number, LexerATNSimulator>
 	get channel(): number {
 		return this._channel;
 	}
+
+	public abstract readonly channelNames: string[];
 
 	public abstract readonly modeNames: string[];
 

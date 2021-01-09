@@ -15,7 +15,7 @@ export interface Tree {
 	readonly parent: Tree | undefined;
 
 	/**
-	 * This method returns whatever object represents the data at this note. For
+	 * This method returns whatever object represents the data at this node. For
 	 * example, for parse trees, the payload can be a {@link Token} representing
 	 * a leaf node or a {@link RuleContext} object representing a rule
 	 * invocation. For abstract syntax trees (ASTs), this is a {@link Token}
@@ -35,7 +35,7 @@ export interface Tree {
 	readonly childCount: number;
 
 	/** Print out a whole tree, not just a node, in LISP format
-	 *  {@code (root child1 .. childN)}. Print just a node if this is a leaf.
+	 *  `(root child1 .. childN)`. Print just a node if this is a leaf.
 	 */
 	toStringTree(): string;
 }

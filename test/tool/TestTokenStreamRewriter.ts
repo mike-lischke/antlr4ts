@@ -11,8 +11,8 @@
 // import static org.junit.Assert.assertEquals;
 // import static org.junit.Assert.assertNotNull;
 
-import { ANTLRInputStream } from "../../src/ANTLRInputStream";
 import { CharStream } from "../../src/CharStream";
+import { CharStreams } from "../../src/CharStreams";
 import { CommonTokenStream } from "../../src/CommonTokenStream";
 import { Interval } from "../../src/misc/Interval";
 import { Lexer } from "../../src/Lexer";
@@ -24,15 +24,15 @@ import { RewriterLexer2 } from "./gen/rewriter/RewriterLexer2";
 import { RewriterLexer3 } from "./gen/rewriter/RewriterLexer3";
 
 import * as assert from "assert";
-import { suite, test as Test, skip as Ignore } from "mocha-typescript";
+import { suite, test as Test, skip as Ignore } from "@testdeck/mocha";
 
 @suite
 export class TestTokenStreamRewriter {
 
 	private createLexerInterpreter(input: string, lexerCtor: {new(stream: CharStream): Lexer}): LexerInterpreter {
-		let stream = new ANTLRInputStream(input);
+		let stream = CharStreams.fromString(input);
 		let lexer = new lexerCtor(stream);
-		return new LexerInterpreter(lexer.grammarFileName, lexer.vocabulary, lexer.modeNames, lexer.ruleNames, lexer.atn, stream);
+		return new LexerInterpreter(lexer.grammarFileName, lexer.vocabulary, lexer.ruleNames, lexer.channelNames, lexer.modeNames, lexer.atn, stream);
 	}
 
 	@Test public testInsertBeforeIndex0(): void {
@@ -245,7 +245,8 @@ export class TestTokenStreamRewriter {
 		}
 
 		let expecting: string =  "insert op <InsertBeforeOp@[@1,1:1='b',<2>,1:1]:\"0\"> within boundaries of previous <ReplaceOp@[@0,0:0='a',<1>,1:0]..[@2,2:2='c',<3>,1:2]:\"x\">";
-		assert.notEqual(exc, null);
+		assert.notStrictEqual(exc, null);
+		assert.notStrictEqual(exc, undefined);
 		assert.strictEqual(exc!.message, expecting);
 	}
 
@@ -365,7 +366,8 @@ export class TestTokenStreamRewriter {
 		}
 
 		let expecting: string =  "insert op <InsertBeforeOp@[@4,4:4='c',<3>,1:4]:\"y\"> within boundaries of previous <ReplaceOp@[@2,2:2='c',<3>,1:2]..[@4,4:4='c',<3>,1:4]:\"x\">";
-		assert.notEqual(exc, null);
+		assert.notStrictEqual(exc, null);
+		assert.notStrictEqual(exc, undefined);
 		assert.strictEqual(exc!.message, expecting);
 	}
 
@@ -429,7 +431,8 @@ export class TestTokenStreamRewriter {
 		}
 
 		let expecting: string =  "replace op boundaries of <ReplaceOp@[@3,3:3='c',<3>,1:3]..[@5,5:5='b',<2>,1:5]:\"foo\"> overlap with previous <ReplaceOp@[@2,2:2='c',<3>,1:2]..[@4,4:4='c',<3>,1:4]:\"xyz\">";
-		assert.notEqual(exc, null);
+		assert.notStrictEqual(exc, null);
+		assert.notStrictEqual(exc, undefined);
 		assert.strictEqual(exc!.message, expecting);
 	}
 
@@ -456,7 +459,8 @@ export class TestTokenStreamRewriter {
 		}
 
 		let expecting: string =  "replace op boundaries of <ReplaceOp@[@1,1:1='b',<2>,1:1]..[@3,3:3='c',<3>,1:3]:\"foo\"> overlap with previous <ReplaceOp@[@2,2:2='c',<3>,1:2]..[@4,4:4='c',<3>,1:4]:\"xyz\">";
-		assert.notEqual(exc, null);
+		assert.notStrictEqual(exc, null);
+		assert.notStrictEqual(exc, undefined);
 		assert.strictEqual(exc!.message, expecting);
 	}
 
@@ -584,7 +588,8 @@ export class TestTokenStreamRewriter {
 		}
 
 		let expecting: string =  "replace op boundaries of <ReplaceOp@[@1,1:1='b',<2>,1:1]..[@2,2:2='c',<3>,1:2]:\"foo\"> overlap with previous <ReplaceOp@[@0,0:0='a',<1>,1:0]..[@3,3:3='c',<3>,1:3]:\"bar\">";
-		assert.notEqual(exc, null);
+		assert.notStrictEqual(exc, null);
+		assert.notStrictEqual(exc, undefined);
 		assert.strictEqual(exc!.message, expecting);
 	}
 

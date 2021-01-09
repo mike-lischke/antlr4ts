@@ -6,7 +6,7 @@
 import {Equatable} from "../src/misc/Stubs";
 import {Array2DHashSet} from "../src/misc/Array2DHashSet";
 import {MurmurHash} from "../src/misc/MurmurHash";
-import { suite, test } from "mocha-typescript";
+import { suite, test } from "@testdeck/mocha";
 import * as assert from "assert";
 
 class EquatableTest implements Equatable {
@@ -51,11 +51,11 @@ describe("EquatableTest", () => {
 	});
 
 	it("should hash identical values the same", () => {
-		assert.equal(alpha.hashCode(), alpha_again.hashCode());
+		assert.strictEqual(alpha.hashCode(), alpha_again.hashCode());
 	});
 
 	it("should hash different values differently", () => {
-		assert.notEqual(alpha.hashCode(), beta.hashCode());
+		assert.notStrictEqual(alpha.hashCode(), beta.hashCode());
 	});
 });
 
@@ -66,12 +66,12 @@ describe("Array2DHashSet", () => {
 
 	it("shoud count entities", () => {
 		assert( set.isEmpty );
-		assert.equal( set.size, 0 );
+		assert.strictEqual( set.size, 0 );
 		set.add(alpha);
 		assert( !set.isEmpty);
-		assert.equal(set.size, 1);
+		assert.strictEqual(set.size, 1);
 		set.add(beta);
-		assert.equal(set.size, 2);
+		assert.strictEqual(set.size, 2);
 	});
 
 	it("should check entries by value", () => {
@@ -84,7 +84,7 @@ describe("Array2DHashSet", () => {
 });
 
 //
-// This exercises the mocha-typescript package's ability to
+// This exercises the @testdesk/mocha package's ability to
 // use more object-oriented test structure using decorators.
 //
 @suite class DecoratorDriven {
